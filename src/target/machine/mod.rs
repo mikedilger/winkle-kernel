@@ -28,3 +28,9 @@ compile_error!("Winkle requires a specific machine to be defined");
     not(machine = "polarfire-icicle-kit")
 ))]
 compile_error!("Winkle does not support the specified machine");
+
+/*
+ * Each machine needs to define the following:
+ *
+ *   The label "_start" where execution begins
+ */
