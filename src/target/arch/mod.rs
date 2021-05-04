@@ -17,4 +17,5 @@ compile_error!("Winkle does not support the specified target architecture.");
  *      impl AtomicCell
  *
  *   pub fn fence()
+ *   pub fn cpu_number() -> u32
  */

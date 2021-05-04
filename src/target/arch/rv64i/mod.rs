@@ -18,3 +18,12 @@ pub extern "C" fn abort() -> ! {
 
 mod ordering;
 pub use ordering::*;
+
+#[inline(always)]
+#[allow(dead_code)]
+#[allow(unused_assignments)]
+pub fn cpu_number() -> u32 {
+    let mut hart_id: u32 = 0;
+    unsafe { llvm_asm!("csrr $0, mhartid" : "=r"(hart_id) ::: "volatile"); }
+    hart_id
+}
