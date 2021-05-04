@@ -15,4 +15,6 @@ compile_error!("Winkle does not support the specified target architecture.");
  *   AtomicPtr for i32, u32, i64, u64, isize and usize
  *      fn new(usize)
  *      impl AtomicCell
+ *
+ *   pub fn fence()
  */

@@ -15,3 +15,6 @@ pub extern "C" fn abort() -> ! {
 	}
     }
 }
+
+mod ordering;
+pub use ordering::*;
