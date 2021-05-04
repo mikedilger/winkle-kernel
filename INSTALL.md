@@ -49,3 +49,10 @@ In the `machines/` directory are a set of environment settings for building for 
     $ source ./machines/riscv64imac-qemu.env
 ````
 
+## Build
+From the base directory (unfortunately for now, due to env file requirements) run:
+
+````sh
+    $ cargo build
+````
+
