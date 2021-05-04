@@ -33,4 +33,5 @@ compile_error!("Winkle does not support the specified machine");
  * Each machine needs to define the following:
  *
  *   The label "_start" where execution begins
+ *   const UART0_ADDR: usize
  */
