@@ -6,3 +6,9 @@ pub use rv64i::*;
 
 #[cfg(all(not(target_arch="riscv64")))]
 compile_error!("Winkle does not support the specified target architecture.");
+
+/*
+ * Each architecture needs to define the following:
+ *
+ *   pub extern "C" fn abort() -> !
+ */
