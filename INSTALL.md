@@ -46,7 +46,7 @@ Install the cargo binutils:
 In the `machines/` directory are a set of environment settings for building for various machines. Source one of them in your active shell(s). E.g.:
 
 ````sh
-    $ source ./machines/riscv64imac-qemu.env
+    $ source ./machines/qemu-riscv64imac-virt.env
 ````
 
 ## Build
