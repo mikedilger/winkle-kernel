@@ -1,6 +1,7 @@
 
 #![no_std]
 #![no_main]
+#![feature(asm, llvm_asm, global_asm)]
 
 mod target;
 
