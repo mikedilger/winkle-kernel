@@ -5,6 +5,7 @@
 #![feature(panic_info_message)]
 
 mod atomic;
+mod register;
 mod target;
 
 #[panic_handler]
