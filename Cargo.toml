@@ -1,8 +1,11 @@
 [package]
 name = "winkle-kernel"
 version = "0.1.0"
-authors = ["Mike Dilger <mike@optcomp.nz>"]
+authors = ["Mike Dilger <mike@mikedilger.com>"]
 edition = "2018"
+description = "Winkle OS kernel"
+readme = "README.md"
+license-file = "LICENSE"
 
 [[bin]]
 name = "kernel"
