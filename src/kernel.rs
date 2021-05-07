@@ -6,6 +6,7 @@
 
 mod atomic;
 mod register;
+mod spinlock;
 mod target;
 
 #[panic_handler]
