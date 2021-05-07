@@ -7,6 +7,9 @@ For quite a while nothing groundbreaking will be happening here. Once I get over
 * Using lock-free data structures in shared memory for async message passing, along the same lines as linux io_uring does between userspace and the kernel.
 * Capability based access control
 
+WARNING:  I will be force-pushing to this repository rewriting history from time to time while it is early days. At some point I will stop doing this, and when I do, I will remove this warning from the README file.
+
+
 ## Installation
 
 See [INSTALL](https://github.com/mikedilger/winkle-kernel/blob/main/INSTALL.md)
