@@ -1,4 +1,6 @@
 
+pub mod sifive;
+
 use core::fmt::Write;
 
 pub trait Uart: Write {
