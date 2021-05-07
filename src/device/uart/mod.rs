@@ -1,5 +1,6 @@
 
 pub mod sifive;
+pub mod uart16550;
 
 use core::fmt::Write;
 
