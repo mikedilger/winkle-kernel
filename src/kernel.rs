@@ -4,6 +4,7 @@
 #![feature(asm, llvm_asm, global_asm)]
 #![feature(panic_info_message)]
 
+mod atomic;
 mod target;
 
 #[panic_handler]
