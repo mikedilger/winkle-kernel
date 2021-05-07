@@ -21,3 +21,4 @@ lto = true
 codegen-units = 1
 
 [dependencies]
+bit_field = "0.10"
