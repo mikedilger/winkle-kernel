@@ -2,7 +2,7 @@
 use core::fmt::{Write, Error};
 use crate::spinlock::Spinlock;
 use crate::register::{RegisterU8RO, RegisterU8WO, RegisterU8RW, RegisterU16RW};
-use crate::device::uart::Uart;
+use crate::device::uart::{Uart, UartParity};
 use bit_field::BitField;
 
 pub struct Uart16550 {
@@ -27,6 +27,15 @@ impl Uart for Uart16550 {
     fn get_maybe(&self) -> Option<u8> {
         let inner_guard = self.inner.lock();
         inner_guard.get_maybe()
+    }
+
+    fn set_line_settings(&self,
+                         parity: UartParity,
+                         data_bits: u8,
+                         stop_bits: u8)
+    {
+        let inner_guard = self.inner.lock();
+        inner_guard.set_line_settings(parity, data_bits, stop_bits);
     }
 }
 
@@ -115,6 +124,29 @@ impl InnerUart16550 {
         } else {
             Some(unsafe { self.rbr() }.fetch())
         }
+    }
+
+    fn set_line_settings(&self, parity: UartParity,
+                         mut data_bits: u8,
+                         mut stop_bits: u8)
+    {
+        // Bound values to supported ranges
+        if data_bits<5 { data_bits = 5; }
+        else if data_bits>8 { data_bits = 8; }
+        if stop_bits < 1 { stop_bits = 1; }
+        else if stop_bits > 2 { stop_bits = 2; }
+
+        let mut lcr = data_bits;
+        if stop_bits==2 { lcr.set_bit(2, true); }
+        match parity {
+            UartParity::None => lcr.set_bits(3..=5, 0b000),
+            UartParity::Even => lcr.set_bits(3..=5, 0b011),
+            UartParity::EvenSticky => lcr.set_bits(3..=5, 0b111),
+            UartParity::Odd => lcr.set_bits(3..=5, 0b001),
+            UartParity::OddSticky => lcr.set_bits(3..=5, 0b101),
+        };
+
+        unsafe { self.lcr() }.store(lcr);
     }
 }
 

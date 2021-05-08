@@ -3,7 +3,7 @@ use core::fmt::{Write, Error};
 use bit_field::BitField;
 use crate::register::{AtomicRegisterI32RW, AtomicRegisterI32RO,
                       AtomicRegisterU32RW, AtomicRegisterU32RO};
-use crate::device::uart::Uart;
+use crate::device::uart::{Uart, UartParity};
 
 /* This is the SiFive style UART */
 pub struct SifiveUart {
@@ -69,6 +69,25 @@ impl Uart for SifiveUart {
             return None
         } else {
             return Some(v.get_bits(0..=7) as u8)
+        }
+    }
+
+    // data_bits is ignored, device only supports 8.
+    // parity is ignored, device only supports no parity.
+    fn set_line_settings(&self,
+                         _parity: UartParity,
+                         _data_bits: u8,
+                         mut stop_bits: u8)
+    {
+        if stop_bits<1 { stop_bits=1; }
+        else if stop_bits>2 { stop_bits=2; }
+
+        if stop_bits==2 {
+            // set bit 1
+            unsafe { self.txctrl() }.fetch_or( 0b10_u32 );
+        } else {
+            // clear bit 1
+            unsafe { self.txctrl() }.fetch_and( ! 0b10_u32 );
         }
     }
 }
