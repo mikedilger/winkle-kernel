@@ -28,7 +28,10 @@ fn panic(info: &core::panic::PanicInfo) -> !
 
 #[no_mangle]
 extern "C" fn kernel_start() {
-    // This initializes the kernel.
+
+    // Initialize UART
+    use device::uart::{Uart, UartParity};
+    unsafe { CONSOLE.set_line_settings(UartParity::None, 8, 1) };
 
     println!("Hello World!\n");
 
