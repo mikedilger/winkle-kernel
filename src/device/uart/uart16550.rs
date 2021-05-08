@@ -1,7 +1,7 @@
 
 use core::fmt::{Write, Error};
 use crate::spinlock::Spinlock;
-use crate::register::{RegisterU8RO, RegisterU8WO, RegisterU8RW, RegisterU16RW};
+use crate::register::{RegisterU8RO, RegisterU8WO, RegisterU8RW};
 use crate::device::uart::{Uart, UartParity};
 use bit_field::BitField;
 
@@ -37,6 +37,11 @@ impl Uart for Uart16550 {
         let inner_guard = self.inner.lock();
         inner_guard.set_line_settings(parity, data_bits, stop_bits);
     }
+
+    fn set_baud_rate(&self, baud_hz: u32, uart_clock_hz: u32) {
+        let inner_guard = self.inner.lock();
+        inner_guard.set_baud_rate(baud_hz, uart_clock_hz);
+    }
 }
 
 impl Write for Uart16550 {
@@ -49,7 +54,7 @@ impl Write for Uart16550 {
     }
 }
 
-pub struct InnerUart16550 {
+struct InnerUart16550 {
     base_address: usize,
 }
 
@@ -107,8 +112,13 @@ impl InnerUart16550 {
     }
 
     #[inline(always)]
-    unsafe fn dlr(&self) -> RegisterU16RW {
-        RegisterU16RW::new(self.base_address)
+    unsafe fn dlr_lsb(&self) -> RegisterU8RW {
+        RegisterU8RW::new(self.base_address)
+    }
+
+    #[inline(always)]
+    unsafe fn dlr_msb(&self) -> RegisterU8RW {
+        RegisterU8RW::new(self.base_address + 0x01)
     }
 
     pub fn put(&self, c: u8) {
@@ -126,9 +136,9 @@ impl InnerUart16550 {
         }
     }
 
-    fn set_line_settings(&self, parity: UartParity,
-                         mut data_bits: u8,
-                         mut stop_bits: u8)
+    pub fn set_line_settings(&self, parity: UartParity,
+                             mut data_bits: u8,
+                             mut stop_bits: u8)
     {
         // Bound values to supported ranges
         if data_bits<5 { data_bits = 5; }
@@ -146,6 +156,27 @@ impl InnerUart16550 {
             UartParity::OddSticky => lcr.set_bits(3..=5, 0b101),
         };
 
+        unsafe { self.lcr() }.store(lcr);
+    }
+
+    pub fn set_baud_rate(&self, baud_hz: u32, uart_clock_hz: u32)
+    {
+        // Compute the divisor
+        let divisor: u16 = (uart_clock_hz / (baud_hz * 16)) as u16;
+        let divisor_lsb: u8 = (divisor & 0x00FF) as u8;
+        let divisor_msb: u8 = ((divisor & 0xFF00) >> 8) as u8;
+
+        // Turn on the divisor latch
+        let mut lcr = unsafe { self.lcr() }.fetch();
+        lcr.set_bit(7, true);
+        unsafe { self.lcr() }.store(lcr);
+
+        // Write the divisor
+        unsafe { self.dlr_msb() }.store(divisor_msb);
+        unsafe { self.dlr_lsb() } .store(divisor_lsb);
+
+        // Turn off the divisor latch
+        lcr.set_bit(7, false);
         unsafe { self.lcr() }.store(lcr);
     }
 }

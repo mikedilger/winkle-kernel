@@ -1,4 +1,6 @@
 
+// This UART is documented in fu740-c000-manual-v1p2.pdf
+
 use core::fmt::{Write, Error};
 use bit_field::BitField;
 use crate::register::{AtomicRegisterI32RW, AtomicRegisterI32RO,
@@ -88,6 +90,25 @@ impl Uart for SifiveUart {
         } else {
             // clear bit 1
             unsafe { self.txctrl() }.fetch_and( ! 0b10_u32 );
+        }
+    }
+
+    fn set_baud_rate(&self, baud_hz: u32, uart_clock_hz: u32) {
+        let mut divisor = uart_clock_hz / baud_hz - 1;
+
+        // minimum due to recv oversampling requirement
+        if divisor < 16 { divisor = 16; }
+
+        // Bits 16..31 are reserved. We can't atomically set the lower 16
+        // bits while preserving the upper 16.  So we read the register,
+        // and use compare_and_swap to write the lower 16 only if the upper
+        // 16 haven't chnaged out from under us.  If they have, we loop
+        // around and try again.
+        loop {
+            let divreg = unsafe { self.div() }.fetch();
+            let newdivreg = (divreg & 0xFFFF_0000) + (divisor & 0x0000_FFFF);
+            let cas_result = unsafe { self.div() }.compare_and_swap(divreg, newdivreg);
+            if cas_result == divreg { break; }
         }
     }
 }
