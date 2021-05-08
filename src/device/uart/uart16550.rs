@@ -41,57 +41,79 @@ impl Write for Uart16550 {
 }
 
 pub struct InnerUart16550 {
-    rbr: RegisterU8RO,
-    thr: RegisterU8WO,
-    #[allow(dead_code)]
-    ier: RegisterU8RW,
-    #[allow(dead_code)]
-    iir: RegisterU8RO,
-    #[allow(dead_code)]
-    fcr: RegisterU8WO,
-    #[allow(dead_code)]
-    lcr: RegisterU8RW,
-    #[allow(dead_code)]
-    mcr: RegisterU8RW,
-    lsr: RegisterU8RO,
-    #[allow(dead_code)]
-    msr: RegisterU8RO,
-    #[allow(dead_code)]
-    dlr: RegisterU16RW
+    base_address: usize,
 }
 
+#[allow(dead_code)]
 impl InnerUart16550 {
-    #[allow(dead_code)]
-    pub const fn new(base_address: usize) -> Self {
-        unsafe {
-            InnerUart16550 {
-                rbr: RegisterU8RO::new(base_address),
-                thr: RegisterU8WO::new(base_address),
-                ier: RegisterU8RW::new(base_address + 0x1),
-                iir: RegisterU8RO::new(base_address + 0x2),
-                fcr: RegisterU8WO::new(base_address + 0x2),
-                lcr: RegisterU8RW::new(base_address + 0x3),
-                mcr: RegisterU8RW::new(base_address + 0x4),
-                lsr: RegisterU8RO::new(base_address + 0x5),
-                msr: RegisterU8RO::new(base_address + 0x6),
-                dlr: RegisterU16RW::new(base_address),
-            }
+    pub const unsafe fn new(base_address: usize) -> Self {
+        InnerUart16550 {
+            base_address: base_address
         }
+    }
+
+    #[inline(always)]
+    unsafe fn rbr(&self) -> RegisterU8RO {
+        RegisterU8RO::new(self.base_address)
+    }
+
+    #[inline(always)]
+    unsafe fn thr(&self) -> RegisterU8WO {
+        RegisterU8WO::new(self.base_address)
+    }
+
+    #[inline(always)]
+    unsafe fn ier(&self) -> RegisterU8RW {
+        RegisterU8RW::new(self.base_address + 0x1)
+    }
+
+    #[inline(always)]
+    unsafe fn iir(&self) -> RegisterU8RO {
+        RegisterU8RO::new(self.base_address + 0x2)
+    }
+
+    #[inline(always)]
+    unsafe fn fcr(&self) -> RegisterU8WO {
+        RegisterU8WO::new(self.base_address + 0x2)
+    }
+
+    #[inline(always)]
+    unsafe fn lcr(&self) -> RegisterU8RW {
+        RegisterU8RW::new(self.base_address + 0x3)
+    }
+
+    #[inline(always)]
+    unsafe fn mcr(&self) -> RegisterU8RW {
+        RegisterU8RW::new(self.base_address + 0x4)
+    }
+
+    #[inline(always)]
+    unsafe fn lsr(&self) -> RegisterU8RO {
+        RegisterU8RO::new(self.base_address + 0x5)
+    }
+
+    #[inline(always)]
+    unsafe fn msr(&self) -> RegisterU8RO {
+        RegisterU8RO::new(self.base_address + 0x6)
+    }
+
+    #[inline(always)]
+    unsafe fn dlr(&self) -> RegisterU16RW {
+        RegisterU16RW::new(self.base_address)
     }
 
     pub fn put(&self, c: u8) {
         loop {
-            if self.lsr.fetch().get_bit(5) { break; }
+            if unsafe { self.lsr() }.fetch().get_bit(5) { break; }
         }
-        self.thr.store(c);
+        unsafe { self.thr() }.store(c);
     }
 
-    #[allow(dead_code)]
     pub fn get_maybe(&self) -> Option<u8> {
-        if self.lsr.fetch().get_bit(0) {
+        if unsafe { self.lsr() }.fetch().get_bit(0) {
             None
         } else {
-            Some(self.rbr.fetch())
+            Some(unsafe { self.rbr() }.fetch())
         }
     }
 }
