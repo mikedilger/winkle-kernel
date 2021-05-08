@@ -4,6 +4,8 @@
 #![feature(asm, llvm_asm, global_asm)]
 #![feature(panic_info_message)]
 
+include!("macros.rs");
+
 mod atomic;
 mod device;
 mod register;
