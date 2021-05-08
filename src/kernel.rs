@@ -5,6 +5,7 @@
 #![feature(panic_info_message)]
 
 mod atomic;
+mod device;
 mod register;
 mod spinlock;
 mod target;
