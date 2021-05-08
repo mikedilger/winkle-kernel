@@ -216,13 +216,6 @@ macro_rules! impl_register_wo {
             }
 
             #[allow(dead_code)]
-            pub fn fetch(&self) -> $inner {
-                unsafe {
-                    core::ptr::read_volatile(self.0)
-                }
-            }
-
-            #[allow(dead_code)]
             pub fn store(&self, t: $inner) {
                 unsafe {
                     core::ptr::write_volatile(self.0, t)
@@ -246,6 +239,13 @@ macro_rules! impl_register_rw {
             #[inline(always)]
             pub const unsafe fn new(addr: usize) -> $typ {
                 $typ(addr as *mut $inner)
+            }
+
+            #[allow(dead_code)]
+            pub fn fetch(&self) -> $inner {
+                unsafe {
+                    core::ptr::read_volatile(self.0)
+                }
             }
 
             #[allow(dead_code)]
