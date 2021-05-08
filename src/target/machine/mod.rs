@@ -34,4 +34,8 @@ compile_error!("Winkle does not support the specified machine");
  *
  *   The label "_start" where execution begins
  *   const UART0_ADDR: usize
+ *   static CONSOLE: T
+ *       where T: Uart
+ *       and has const new fn
  */
+

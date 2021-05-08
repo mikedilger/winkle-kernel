@@ -10,6 +10,8 @@ mod register;
 mod spinlock;
 mod target;
 
+use target::CONSOLE;
+
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> !
 {
