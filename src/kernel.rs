@@ -30,7 +30,7 @@ fn panic(info: &core::panic::PanicInfo) -> !
 extern "C" fn kernel_start() {
     // This initializes the kernel.
 
-    kdebug(b"Testing\n");
+    println!("Hello World!\n");
 
     panic!("Not yet implemented.\n");
 }

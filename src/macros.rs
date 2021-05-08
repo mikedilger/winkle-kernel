@@ -14,6 +14,6 @@ macro_rules! println {
 macro_rules! print {
     ($($args:tt)+) => ({
         use core::fmt::Write;
-        let _ = write!(crate::CONSOLE, $($args)+);
+        let _ = unsafe { write!(crate::CONSOLE, $($args)+) };
     });
 }
