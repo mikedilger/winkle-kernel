@@ -10,12 +10,15 @@ pub static mut CONSOLE: SifiveUart = unsafe { SifiveUart::new(UART0_ADDR) };
 #[inline(always)]
 pub fn pause() {
     unsafe {
-        // LLVM does not support (yet?) Zihintpause feature.  Once it does,
-        // we may need a new target json file that enables this processor feature
-        // e.g. "features": "+64bit,+m,+a,+c,+zihintpause",
-	// llvm_asm!("pause"::::"volatile");
+        // PAUSE instruction (not yet in llvm backend)
+        llvm_asm!(".word 0x0100000F" : : : : "volatile");
+    }
+}
 
-        // Until then, we just issue a FENCE
-        asm!("fence");
+#[allow(dead_code)]
+#[inline(always)]
+pub fn cease() {
+    unsafe {
+        llvm_asm!(".word 0x30500073" : : : "memory" : "volatile");
     }
 }
