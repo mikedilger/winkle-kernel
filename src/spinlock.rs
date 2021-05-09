@@ -30,9 +30,11 @@ impl<T: ?Sized> Spinlock<T> {
     /// Lock and return a guard
     #[allow(dead_code)]
     pub fn lock(&self) -> SpinlockGuard<T> {
-        let mut previous_value = true;
-        while previous_value != false {
+        let mut previous_value;
+        loop {
             previous_value = self.locked.compare_and_swap(false, true);
+            if previous_value == false { break; }
+            crate::target::pause();
         }
         SpinlockGuard {
             spinlock: &self,

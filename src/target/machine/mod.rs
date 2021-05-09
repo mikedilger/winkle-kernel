@@ -37,5 +37,6 @@ compile_error!("Winkle does not support the specified machine");
  *   static CONSOLE: T
  *       where T: Uart
  *       and has const new fn
+ *   fn pause()
  */
 
