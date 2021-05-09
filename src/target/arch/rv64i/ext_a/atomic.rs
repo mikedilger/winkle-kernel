@@ -201,6 +201,32 @@ macro_rules! impl_atomic_ptr {
             }
         }
 
+        #[allow(dead_code)]
+        impl AtomicPtr<$typ> {
+            /// This function ANDs the value with `and` and then ORs it with `or`, but atomically
+            /// This is useful for setting a subset of bits without disturbing other bits.
+            #[inline(always)]
+            pub fn fetch_and_or(&self, and: $typ, or: $typ) -> $typ {
+                let mut output: $typ;
+                unsafe {
+                    // Note: risc-v guarantees eventual success and forward progress
+                    // (avoiding livelock) as this sequence meets the constraints for
+                    // said guarantee
+                    llvm_asm!(concat!("1:
+                       lr.",$w,".aqrl $0, ($1)
+                       andi $0, $0, $2
+                       ori $0, $0, $3
+                       sc.",$w,".aqrl t0, $0, ($1)
+                       bnez t0, 1b")
+                              : "=&r"(output) // $0 is output, = means write, & means clobbered before all inputs used, r means register
+                              : "r"(self.ptr), "r"(and), "r"(or) // $1=pointer to mem, $2=AND, $3=OR
+                              : "t0"
+                              : "volatile");
+                }
+                output
+            }
+        }
+
         unsafe impl Send for AtomicPtr<$typ> {}
         unsafe impl Sync for AtomicPtr<$typ> {}
     );
