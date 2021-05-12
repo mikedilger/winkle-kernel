@@ -44,7 +44,9 @@ macro_rules! impl_atomic_ptr {
             #[inline(always)]
             fn store(&self, t: Self::T) {
                 unsafe {
-                    llvm_asm!(concat!("amoswap.",$w," zero, $0, ($1)") :: "r"(t), "r"(self.ptr) :: "volatile");
+                    // There is no need to be atomic here, it's just a store.
+                    // llvm_asm!(concat!("amoswap.",$w," zero, $0, ($1)") :: "r"(t), "r"(self.ptr) :: "volatile");
+                    *self.ptr = t;
                 }
             }
 
@@ -75,12 +77,11 @@ macro_rules! impl_atomic_ptr {
 
             #[inline(always)]
             fn fetch(&self) -> Self::T {
-                let mut output: Self::T;
                 unsafe {
-                    llvm_asm!(concat!("lr.",$w,".aq $0, ($1)") : "=r"(output) : "r"(self.ptr) :: "volatile");
+                    // There is no need to be atomic here, it's just a load
+                    // llvm_asm!(concat!("lr.",$w,".aq $0, ($1)") : "=r"(output) : "r"(self.ptr) :: "volatile");
+                    *self.ptr
                 }
-                core::sync::atomic::compiler_fence(Ordering::Acquire);
-                output
             }
 
             #[inline(always)]
