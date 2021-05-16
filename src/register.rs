@@ -1,6 +1,7 @@
 
 use crate::target::AtomicPtr;
 use crate::atomic::Atomic;
+use crate::spinlock::Spinlock;
 
 macro_rules! impl_atomic_register_ro {
     ($typ:ident, $inner:ty) => (
@@ -21,6 +22,18 @@ macro_rules! impl_atomic_register_ro {
             #[inline(always)]
             pub fn fetch_seqcst(&self) -> $inner {
                 self.0.fetch_seqcst()
+            }
+
+            #[inline(always)]
+            pub fn get_bits<T: core::ops::RangeBounds<usize>>(&self, range: T) -> $inner {
+                use bit_field::BitField;
+                self.0.fetch().get_bits(range)
+            }
+
+            #[inline(always)]
+            pub fn get_bit(&self, bit: usize) -> bool {
+                use bit_field::BitField;
+                self.0.fetch().get_bit(bit)
             }
         }
     );
@@ -160,6 +173,31 @@ macro_rules! impl_atomic_register_rw {
             pub fn fetch_min(&self, t: $inner) -> $inner {
                 self.0.fetch_min(t)
             }
+
+            #[inline(always)]
+            pub fn get_bits<T: core::ops::RangeBounds<usize>>(&self, range: T) -> $inner {
+                use bit_field::BitField;
+                self.0.fetch().get_bits(range)
+            }
+
+            // Put bits is not possible atomically without locking. We will make a locking
+            // variant to handle these cases.
+
+            #[inline(always)]
+            pub fn get_bit(&self, bit: usize) -> bool {
+                use bit_field::BitField;
+                self.0.fetch().get_bit(bit)
+            }
+
+            #[inline(always)]
+            pub fn set_bit(&self, bit: usize) {
+                self.0.fetch_or( 0x1 << bit );
+            }
+
+            #[inline(always)]
+            pub fn clear_bit(&self, bit: usize) {
+                self.0.fetch_and( ! ( 0x1 << bit ) );
+            }
         }
     );
 }
@@ -169,6 +207,138 @@ impl_atomic_register_rw!(AtomicRegisterI32RW, i32);
 impl_atomic_register_rw!(AtomicRegisterU64RW, u64);
 impl_atomic_register_rw!(AtomicRegisterI64RW, i64);
 
+macro_rules! impl_atomic_register_rw_with_lock {
+    ($typ:ident, $inner:ty) => (
+        pub struct $typ(Spinlock<AtomicPtr<$inner>>);
+
+        #[allow(dead_code)]
+        impl $typ {
+            #[inline(always)]
+            pub const unsafe fn new(addr: usize) -> $typ {
+                $typ(Spinlock::new(AtomicPtr::<$inner>::new_address(addr)))
+            }
+
+            #[inline(always)]
+            pub fn store(&self, t: $inner) {
+                self.0.lock().store(t)
+            }
+
+            #[inline(always)]
+            pub fn store_acq(&self, t: $inner) {
+                self.0.lock().store_acq(t)
+            }
+
+            #[inline(always)]
+            pub fn store_rel(&self, t: $inner) {
+                self.0.lock().store_rel(t)
+            }
+
+            #[inline(always)]
+            pub fn store_seqcst(&self, t: $inner) {
+                self.0.lock().store_seqcst(t)
+            }
+
+            #[inline(always)]
+            pub fn fetch(&self) -> $inner {
+                self.0.lock().fetch()
+            }
+
+            #[inline(always)]
+            pub fn fetch_seqcst(&self) -> $inner {
+                self.0.lock().fetch_seqcst()
+            }
+
+            #[inline(always)]
+            pub fn swap(&self, t: $inner) -> $inner {
+                self.0.lock().swap(t)
+            }
+
+            #[inline(always)]
+            pub fn swap_seqcst(&self, t: $inner) -> $inner {
+                self.0.lock().swap_seqcst(t)
+            }
+
+            #[inline(always)]
+            pub fn compare_and_swap(&self, compare: $inner, t: $inner) -> $inner {
+                self.0.lock().compare_and_swap(compare, t)
+            }
+
+            #[inline(always)]
+            pub fn fetch_add(&self, t: $inner) -> $inner {
+                self.0.lock().fetch_add(t)
+            }
+
+            #[inline(always)]
+            pub fn fetch_sub(&self, t: $inner) -> $inner {
+                self.0.lock().fetch_sub(t)
+            }
+
+            #[inline(always)]
+            pub fn fetch_and(&self, t: $inner) -> $inner {
+                self.0.lock().fetch_and(t)
+            }
+
+            #[inline(always)]
+            pub fn fetch_or(&self, t: $inner) -> $inner {
+                self.0.lock().fetch_or(t)
+            }
+
+            #[inline(always)]
+            pub fn fetch_xor(&self, t: $inner) -> $inner {
+                self.0.lock().fetch_xor(t)
+            }
+
+            #[inline(always)]
+            pub fn fetch_max(&self, t: $inner) -> $inner {
+                self.0.lock().fetch_max(t)
+            }
+
+            #[inline(always)]
+            pub fn fetch_min(&self, t: $inner) -> $inner {
+                self.0.lock().fetch_min(t)
+            }
+
+            #[inline(always)]
+            pub fn get_bits<T: core::ops::RangeBounds<usize>>(&self, range: T) -> $inner {
+                use bit_field::BitField;
+                self.0.lock().fetch().get_bits(range)
+            }
+
+            #[inline(always)]
+            pub fn put_bits<T: core::ops::RangeBounds<usize>>(&self, range: T, t: $inner) {
+                // There is no atomic operation to both set some bits, clear others, and ignore
+                // others without LR/SC, but LR/SC is not typically implemented on registers,
+                // only on normal memory.
+                use bit_field::BitField;
+                let guard = self.0.lock();
+                let mut bits = guard.fetch();
+                bits.set_bits(range, t);
+                guard.store(bits);
+            }
+
+            #[inline(always)]
+            pub fn get_bit(&self, bit: usize) -> bool {
+                use bit_field::BitField;
+                self.0.lock().fetch().get_bit(bit)
+            }
+
+            #[inline(always)]
+            pub fn set_bit(&self, bit: usize) {
+                self.0.lock().fetch_or( 0x1 << bit );
+            }
+
+            #[inline(always)]
+            pub fn clear_bit(&self, bit: usize) {
+                self.0.lock().fetch_and( ! ( 0x1 << bit ) );
+            }
+        }
+    );
+}
+
+impl_atomic_register_rw_with_lock!(AtomicRegisterU32RWSpinlock, u32);
+impl_atomic_register_rw_with_lock!(AtomicRegisterI32RWSpinlock, i32);
+impl_atomic_register_rw_with_lock!(AtomicRegisterU64RWSpinlock, u64);
+impl_atomic_register_rw_with_lock!(AtomicRegisterI64RWSpinlock, i64);
 
 // TODO/FIXME:
 //   RISC-V cannot do atomic operations smaller than 32 bits
