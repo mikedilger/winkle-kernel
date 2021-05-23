@@ -3,15 +3,12 @@ use bit_field::BitField;
 
 pub const CLOCK_REG_BASE: usize = 0x1000_0000;
 
-// note for future: The u32 can only hold up to about 4.29 GHz.
-// This does not lock, and you might get an invalid value if the frequency is being changed
-// while this function is running.
 #[allow(dead_code)]
-pub fn get_core_frequency() -> u32 {
+pub fn get_core_frequency() -> u64 {
 
     // COREPLL is configured in software by setting the corepllcfg0 PRCI control register.
     // The input reference frequency for COREPLL is 26 MHz.
-    let mut freq = 26_000_000; // hfclk
+    let mut freq: u64 = 26_000_000; // hfclk
 
     let core_pllcfg_register = core_pllcfg::get_register();
     let divr = core_pllcfg_register.get_bits(0..=5) as u32;
@@ -28,7 +25,7 @@ pub fn get_core_frequency() -> u32 {
         // equal to the PRCI PLL configuration register field divr + 1.
         let pre_divide = divr + 1;
 
-        freq = freq / pre_divide;
+        freq = freq / (pre_divide as u64);
     }
 
     // pll loop
@@ -37,7 +34,7 @@ pub fn get_core_frequency() -> u32 {
         // value is equal to 2 * (divf + 1).
         // NOTE: this actually multiplies the frequency
 
-        freq = freq * (2 * (divf as u32 + 1));
+        freq = freq * (2 * (divf as u32 + 1)) as u64;
     }
 
     // output divider
@@ -48,12 +45,78 @@ pub fn get_core_frequency() -> u32 {
 
         // There is a further output divider after the PLL loop. The divider value is
         // equal to 2**divq.
-        let output_divide = 2_u32.pow(divq as u32);
+        let output_divide = 2_u64.pow(divq as u32);
 
         freq = freq / output_divide;
     }
 
     freq
+}
+
+// Try to set the core frequency to the target value.
+// The actual value set will be returned (as close as we could get it)
+#[allow(dead_code)]
+pub fn set_core_frequency(mut target: u64) -> u64 {
+    // Put target values in range
+    if target <= 37_500_000 {
+        target = 37_500_000;
+    } else if target >= 2_400_000_000 {
+        target = 2_400_000_000;
+    }
+
+    // Determine divq
+    let mut divq = 0;
+    while target < 2_400_000_000 / 2_u64.pow(divq) {
+        divq += 1;
+    }
+
+    // Determine stage2 output
+    let stage2 = target * 2_u64.pow(divq);
+
+    // Place to store best-so-far settings
+    struct Params {
+        divr: u32,
+        divf: u32,
+        freq: u64,
+        err: u64
+    }
+    let mut best: Option<Params> = None;
+
+    // Setup closures
+    let _freq = |divr: u32, divf: u32, divq: u32| -> u64 {
+        ((26_000_000 / (divr + 1)) * (2 * (divf + 1)) / 2_u32.pow(divq)) as u64
+    };
+    let _dist = |a: u64, b: u64| -> u64 {
+        if a > b { a - b } else { b - a }
+    };
+    let mut _contend = |divr: u32, divf: u32| {
+        let freq = _freq(divr, divf, divq);
+        let err = _dist(freq, target);
+        if best.is_none() {
+            best = Some(Params { divr, divf, freq, err })
+        } else {
+            if err < best.as_ref().unwrap().err {
+                best = Some(Params { divr, divf, freq, err })
+            }
+        }
+    };
+
+    // Try all divr settings
+    for divr in 0..=2 {
+        let stage1: u64 = 26_000_000 / (divr + 1) as u64;
+        let divf_plus1 = ((stage2 / stage1) as u32) / 2;
+        _contend(divr, divf_plus1);
+        if divf_plus1 > 0 { _contend(divr, divf_plus1 - 1); }
+    }
+
+    if let Some(b) = best {
+        unsafe {
+            core_pllcfg::put_pll_params(b.divr as i32, b.divf as i32, divq as i32)
+        };
+        b.freq
+    } else {
+        return get_core_frequency();
+    }
 }
 
 macro_rules! impl_pllcfg {
@@ -78,18 +141,8 @@ macro_rules! impl_pllcfg {
             }
 
             #[inline(always)]
-            pub unsafe fn put_pllr(v: i32) {
-                self::register().put_bits(0..=5, v);
-            }
-
-            #[inline(always)]
             pub fn get_pllf() -> i32 {
                 unsafe { self::register().get_bits(6..=14) }
-            }
-
-            #[inline(always)]
-            pub unsafe fn put_pllf(v: i32) {
-                self::register().put_bits(6..=14, v);
             }
 
             #[inline(always)]
@@ -98,8 +151,13 @@ macro_rules! impl_pllcfg {
             }
 
             #[inline(always)]
-            pub unsafe fn put_pllq(v: i32) {
-                self::register().put_bits(15..=17, v);
+            pub unsafe fn put_pll_params(divr: i32, divf: i32, divq: i32) {
+                use bit_field::BitField;
+                let mut w: i32 = 0;
+                w.set_bits(0..=5, divr);
+                w.set_bits(6..=14, divf);
+                w.set_bits(15..=17, divq);
+                self::register().put_bits(0..=17, w);
             }
 
             #[inline(always)]
