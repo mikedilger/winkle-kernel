@@ -1,6 +1,60 @@
 
+use bit_field::BitField;
+
 pub const CLOCK_REG_BASE: usize = 0x1000_0000;
 
+// note for future: The u32 can only hold up to about 4.29 GHz.
+// This does not lock, and you might get an invalid value if the frequency is being changed
+// while this function is running.
+#[allow(dead_code)]
+pub fn get_core_frequency() -> u32 {
+
+    // COREPLL is configured in software by setting the corepllcfg0 PRCI control register.
+    // The input reference frequency for COREPLL is 26 MHz.
+    let mut freq = 26_000_000; // hfclk
+
+    let core_pllcfg_register = core_pllcfg::get_register();
+    let divr = core_pllcfg_register.get_bits(0..=5) as u32;
+    let divf = core_pllcfg_register.get_bits(6..=14) as u32;
+    let divq = core_pllcfg_register.get_bits(15..=17) as u32;
+
+    // pre-divide
+    {
+        // The minimum supported post-divide frequency is 7 MHz; thus, valid settings are
+        // 0, 1, and 2.
+        // if divr > 2 { divr = 2; }
+
+        // There is a reference frequency divider before the PLL loop. The divider value is
+        // equal to the PRCI PLL configuration register field divr + 1.
+        let pre_divide = divr + 1;
+
+        freq = freq / pre_divide;
+    }
+
+    // pll loop
+    {
+        // The valid PLL VCO range is 2400 MHz to 4800 MHz.  The VCO feedback divider
+        // value is equal to 2 * (divf + 1).
+        // NOTE: this actually multiplies the frequency
+
+        freq = freq * (2 * (divf as u32 + 1));
+    }
+
+    // output divider
+    {
+        // The maximum value of DIVQ is 6, and the valid output
+        // range is 20 to 2400 MHz
+        // if divq > 6 { divq = 6; }
+
+        // There is a further output divider after the PLL loop. The divider value is
+        // equal to 2**divq.
+        let output_divide = 2_u32.pow(divq as u32);
+
+        freq = freq / output_divide;
+    }
+
+    freq
+}
 
 macro_rules! impl_pllcfg {
     ($reg:ident, $offset:expr) => (
@@ -14,9 +68,13 @@ macro_rules! impl_pllcfg {
                 AtomicRegisterI32RWSpinlock::new(CLOCK_REG_BASE + $offset)
             }
 
+            pub fn get_register() -> i32 {
+                unsafe { self::register().fetch() }
+            }
+
             #[inline(always)]
-            pub unsafe fn get_pllr() -> i32 {
-                self::register().get_bits(0..=5)
+            pub fn get_pllr() -> i32 {
+                unsafe { self::register().get_bits(0..=5) }
             }
 
             #[inline(always)]
@@ -25,8 +83,8 @@ macro_rules! impl_pllcfg {
             }
 
             #[inline(always)]
-            pub unsafe fn get_pllf() -> i32 {
-                self::register().get_bits(6..=14)
+            pub fn get_pllf() -> i32 {
+                unsafe { self::register().get_bits(6..=14) }
             }
 
             #[inline(always)]
@@ -35,8 +93,8 @@ macro_rules! impl_pllcfg {
             }
 
             #[inline(always)]
-            pub unsafe fn get_pllq() -> i32 {
-                self::register().get_bits(15..=17)
+            pub fn get_pllq() -> i32 {
+                unsafe { self::register().get_bits(15..=17) }
             }
 
             #[inline(always)]
@@ -45,8 +103,8 @@ macro_rules! impl_pllcfg {
             }
 
             #[inline(always)]
-            pub unsafe fn get_pllrange() -> i32 {
-                self::register().get_bits(18..=20)
+            pub fn get_pllrange() -> i32 {
+                unsafe { self::register().get_bits(18..=20) }
             }
 
             #[inline(always)]
@@ -55,8 +113,8 @@ macro_rules! impl_pllcfg {
             }
 
             #[inline(always)]
-            pub unsafe fn get_pllbypass() -> bool {
-                self::register().get_bit(24)
+            pub fn get_pllbypass() -> bool {
+                unsafe { self::register().get_bit(24) }
             }
 
             #[inline(always)]
@@ -70,8 +128,8 @@ macro_rules! impl_pllcfg {
             }
 
             #[inline(always)]
-            pub unsafe fn get_pllfsebypass() -> bool {
-                self::register().get_bit(25)
+            pub fn get_pllfsebypass() -> bool {
+                unsafe { self::register().get_bit(25) }
             }
 
             #[inline(always)]
@@ -85,8 +143,8 @@ macro_rules! impl_pllcfg {
             }
 
             #[inline(always)]
-            pub unsafe fn get_plllock() -> bool {
-                self::register().get_bit(31)
+            pub fn get_plllock() -> bool {
+                unsafe { self::register().get_bit(31) }
             }
         }
     );
@@ -105,8 +163,8 @@ macro_rules! impl_plloutdiv {
             }
 
             #[inline(always)]
-            pub unsafe fn get_pllcke() -> bool {
-                self::register().get_bit(31)
+            pub fn get_pllcke() -> bool {
+                unsafe { self::register().get_bit(31) }
             }
 
             #[inline(always)]
@@ -134,8 +192,8 @@ pub mod hfxosccfg {
 
     /// Is HFX OSC enabled?  This should be enabled at reset.
     #[inline(always)]
-    pub unsafe fn get_hfxoscen() -> bool {
-        self::register().get_bit(30)
+    pub fn get_hfxoscen() -> bool {
+        unsafe { self::register().get_bit(30) }
     }
 
     #[inline(always)]
@@ -149,8 +207,8 @@ pub mod hfxosccfg {
     }
 
     #[inline(always)]
-    pub unsafe fn get_hfxoscrdy() -> bool {
-        self::register().get_bit(31)
+    pub fn get_hfxoscrdy() -> bool {
+        unsafe { self::register().get_bit(31) }
     }
 }
 
@@ -174,8 +232,8 @@ pub mod hfpclk_div_reg {
     }
 
     #[inline(always)]
-    pub unsafe fn get_hfpclk_div_reg() -> i32 {
-        self::register().fetch()
+    pub fn get_hfpclk_div_reg() -> i32 {
+        unsafe { self::register().fetch() }
     }
 
     #[inline(always)]
@@ -201,8 +259,8 @@ pub mod devices_reset_n {
     }
 
     #[inline(always)]
-    pub unsafe fn get_ddrctrl_reset_n() -> bool {
-        self::register().get_bit(0)
+    pub fn get_ddrctrl_reset_n() -> bool {
+        unsafe { self::register().get_bit(0) }
     }
 
     #[inline(always)]
@@ -216,8 +274,8 @@ pub mod devices_reset_n {
     }
 
     #[inline(always)]
-    pub unsafe fn get_ddraxi_reset_n() -> bool {
-        self::register().get_bit(1)
+    pub fn get_ddraxi_reset_n() -> bool {
+        unsafe { self::register().get_bit(1) }
     }
 
     #[inline(always)]
@@ -231,8 +289,8 @@ pub mod devices_reset_n {
     }
 
     #[inline(always)]
-    pub unsafe fn get_ddrahb_reset_n() -> bool {
-        self::register().get_bit(2)
+    pub fn get_ddrahb_reset_n() -> bool {
+        unsafe { self::register().get_bit(2) }
     }
 
     #[inline(always)]
@@ -246,8 +304,8 @@ pub mod devices_reset_n {
     }
 
     #[inline(always)]
-    pub unsafe fn get_ddrphy_reset_n() -> bool {
-        self::register().get_bit(3)
+    pub fn get_ddrphy_reset_n() -> bool {
+        unsafe { self::register().get_bit(3) }
     }
 
     #[inline(always)]
@@ -261,8 +319,8 @@ pub mod devices_reset_n {
     }
 
     #[inline(always)]
-    pub unsafe fn get_pcieaux_reset_n() -> bool {
-        self::register().get_bit(4)
+    pub fn get_pcieaux_reset_n() -> bool {
+        unsafe { self::register().get_bit(4) }
     }
 
     #[inline(always)]
@@ -276,8 +334,8 @@ pub mod devices_reset_n {
     }
 
     #[inline(always)]
-    pub unsafe fn get_gemgxl_reset_n() -> bool {
-        self::register().get_bit(5)
+    pub fn get_gemgxl_reset_n() -> bool {
+        unsafe { self::register().get_bit(5) }
     }
 
     #[inline(always)]
@@ -302,43 +360,43 @@ pub mod clk_mux_status {
     }
 
     #[inline(always)]
-    pub unsafe fn get_coreclkpllsel() -> bool {
-        self::register().get_bit(0)
+    pub fn get_coreclkpllsel() -> bool {
+        unsafe { self::register().get_bit(0) }
     }
 
     #[inline(always)]
-    pub unsafe fn get_tlclksel() -> bool {
-        self::register().get_bit(1)
+    pub fn get_tlclksel() -> bool {
+        unsafe { self::register().get_bit(1) }
     }
 
     #[inline(always)]
-    pub unsafe fn get_rtcxsel() -> bool {
-        self::register().get_bit(2)
+    pub fn get_rtcxsel() -> bool {
+        unsafe { self::register().get_bit(2) }
     }
 
     #[inline(always)]
-    pub unsafe fn get_ddrctrlclksel() -> bool {
-        self::register().get_bit(3)
+    pub fn get_ddrctrlclksel() -> bool {
+        unsafe { self::register().get_bit(3) }
     }
 
     #[inline(always)]
-    pub unsafe fn get_ddrphyclksel() -> bool {
-        self::register().get_bit(4)
+    pub fn get_ddrphyclksel() -> bool {
+        unsafe { self::register().get_bit(4) }
     }
 
     #[inline(always)]
-    pub unsafe fn get_reserved0() -> bool {
-        self::register().get_bit(5)
+    pub fn get_reserved0() -> bool {
+        unsafe { self::register().get_bit(5) }
     }
 
     #[inline(always)]
-    pub unsafe fn get_gemgxlclksel() -> bool {
-        self::register().get_bit(6)
+    pub fn get_gemgxlclksel() -> bool {
+        unsafe { self::register().get_bit(6) }
     }
 
     #[inline(always)]
-    pub unsafe fn get_mainmemclksel() -> bool {
-        self::register().get_bit(7)
+    pub fn get_mainmemclksel() -> bool {
+        unsafe { self::register().get_bit(7) }
     }
 }
 
@@ -353,32 +411,32 @@ pub mod prci_plls {
     }
 
     #[inline(always)]
-    pub unsafe fn get_cltxpll() -> bool {
-        self::register().get_bit(0)
+    pub fn get_cltxpll() -> bool {
+        unsafe { self::register().get_bit(0) }
     }
 
     #[inline(always)]
-    pub unsafe fn get_gemgxlpll() -> bool {
-        self::register().get_bit(1)
+    pub fn get_gemgxlpll() -> bool {
+        unsafe { self::register().get_bit(1) }
     }
 
     #[inline(always)]
-    pub unsafe fn get_ddrpll() -> bool {
-        self::register().get_bit(2)
+    pub fn get_ddrpll() -> bool {
+        unsafe { self::register().get_bit(2) }
     }
 
     #[inline(always)]
-    pub unsafe fn get_hfpclkpll() -> bool {
-        self::register().get_bit(3)
+    pub fn get_hfpclkpll() -> bool {
+        unsafe { self::register().get_bit(3) }
     }
 
     #[inline(always)]
-    pub unsafe fn get_dvfscorepll() -> bool {
-        self::register().get_bit(4)
+    pub fn get_dvfscorepll() -> bool {
+        unsafe { self::register().get_bit(4) }
     }
 
     #[inline(always)]
-    pub unsafe fn get_corepll() -> bool {
-        self::register().get_bit(5)
+    pub fn get_corepll() -> bool {
+        unsafe { self::register().get_bit(5) }
     }
 }
