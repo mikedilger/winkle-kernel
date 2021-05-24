@@ -3,81 +3,105 @@ use bit_field::BitField;
 
 pub const CLOCK_REG_BASE: usize = 0x1000_0000;
 
+// ANOTHER FIXME GINA // We should check PRCI_PLLS to verify the presence
+// of each PLL before assuming it's there
+
 #[allow(dead_code)]
 pub fn get_core_frequency() -> u64 {
-
     // COREPLL is configured in software by setting the corepllcfg0 PRCI control register.
     // The input reference frequency for COREPLL is 26 MHz.
-    let mut freq: u64 = 26_000_000; // hfclk
+
+    // The minimum supported post-divide frequency is 7 MHz; thus, valid settings are
+    // 0, 1, and 2.
+    // if divr > 2 { divr = 2; }  // in case we find it at 3, we compute as if it were 3
+    //                            // but we never set it to 3.
+
+    // The maximum value of DIVQ is 6, and the valid output
+    // range is 20 to 2400 MHz
+    // if divq > 6 { divq = 6; }  // in case we find it at 7, we compute as if it were 7
+    //                            // but we never set it to 7.
 
     let core_pllcfg_register = core_pllcfg::get_register();
     let divr = core_pllcfg_register.get_bits(0..=5) as u32;
     let divf = core_pllcfg_register.get_bits(6..=14) as u32;
     let divq = core_pllcfg_register.get_bits(15..=17) as u32;
 
-    // pre-divide
-    {
-        // The minimum supported post-divide frequency is 7 MHz; thus, valid settings are
-        // 0, 1, and 2.
-        // if divr > 2 { divr = 2; }
+    // There is a reference frequency divider before the PLL loop. The divider value is
+    // equal to the PRCI PLL configuration register field divr + 1.
+    let pre_divide = divr + 1;
 
-        // There is a reference frequency divider before the PLL loop. The divider value is
-        // equal to the PRCI PLL configuration register field divr + 1.
-        let pre_divide = divr + 1;
+    // The valid PLL VCO range is 2400 MHz to 4800 MHz.  The VCO feedback divider
+    // value is equal to 2 * (divf + 1).
+    let pll_loop = 2 * (divf + 1);
 
-        freq = freq / (pre_divide as u64);
-    }
+    // There is a further output divider after the PLL loop. The divider value is
+    // equal to 2**divq.
+    let post_divide = 2_u32.pow(divq);
 
-    // pll loop
-    {
-        // The valid PLL VCO range is 2400 MHz to 4800 MHz.  The VCO feedback divider
-        // value is equal to 2 * (divf + 1).
-        // NOTE: this actually multiplies the frequency
-
-        freq = freq * (2 * (divf as u32 + 1)) as u64;
-    }
-
-    // output divider
-    {
-        // The maximum value of DIVQ is 6, and the valid output
-        // range is 20 to 2400 MHz
-        // if divq > 6 { divq = 6; }
-
-        // There is a further output divider after the PLL loop. The divider value is
-        // equal to 2**divq.
-        let output_divide = 2_u64.pow(divq as u32);
-
-        freq = freq / output_divide;
-    }
-
-    freq
+    ( (26_000_000 / pre_divide) * pll_loop / post_divide ) as u64
 }
 
 // Try to set the core frequency to the target value.
 // The actual value set will be returned (as close as we could get it)
 #[allow(dead_code)]
-pub fn set_core_frequency(mut target: u64) -> u64 {
-    // Put target values in range
-    if target <= 37_500_000 {
-        target = 37_500_000;
-    } else if target >= 2_400_000_000 {
-        target = 2_400_000_000;
+pub fn set_core_frequency(target: u64) -> u64
+{
+    if let Some((divr, divf, divq)) = compute_pll_params(target) {
+
+        // If we are using corepll (as expected), divert to dvfscorepll
+        if core_clk_sel_reg::using_coreclk_not_hfclk() {
+            // Switch frequency of dvfs core pll
+            unsafe {
+                dvfs_core_pllcfg::put_pll_params(divr as i32, divf as i32, divq as i32)
+            }
+
+            // Wait for PLL to lock
+            while ! dvfs_core_pllcfg::get_plllock() {
+                super::pause();
+            }
+
+            // Switch to it
+            corepllsel::use_dvfscorepll_not_corepll();
+        }
+
+        // Switch frequency of core pll
+        unsafe {
+            core_pllcfg::put_pll_params(divr as i32, divf as i32, divq as i32)
+        }
+
+        // Wait for PLL to lock
+        while ! core_pllcfg::get_plllock() {
+            super::pause();
+        }
+
+        // Switch to it
+        corepllsel::use_corepll_not_dvfscorepll();
+    }
+
+    get_core_frequency()
+}
+
+fn compute_pll_params(mut target_freq: u64) -> Option<(u32, u32, u32)> {
+    // Put target_freq values in range
+    if target_freq <= 37_500_000 {
+        target_freq = 37_500_000;
+    } else if target_freq >= 2_400_000_000 {
+        target_freq = 2_400_000_000;
     }
 
     // Determine divq
     let mut divq = 0;
-    while target < 2_400_000_000 / 2_u64.pow(divq) {
+    while target_freq < 2_400_000_000 / 2_u64.pow(divq) {
         divq += 1;
     }
 
     // Determine stage2 output
-    let stage2 = target * 2_u64.pow(divq);
+    let stage2 = target_freq * 2_u64.pow(divq);
 
     // Place to store best-so-far settings
     struct Params {
         divr: u32,
         divf: u32,
-        freq: u64,
         err: u64
     }
     let mut best: Option<Params> = None;
@@ -91,12 +115,12 @@ pub fn set_core_frequency(mut target: u64) -> u64 {
     };
     let mut _contend = |divr: u32, divf: u32| {
         let freq = _freq(divr, divf, divq);
-        let err = _dist(freq, target);
+        let err = _dist(freq, target_freq);
         if best.is_none() {
-            best = Some(Params { divr, divf, freq, err })
+            best = Some(Params { divr, divf, err })
         } else {
             if err < best.as_ref().unwrap().err {
-                best = Some(Params { divr, divf, freq, err })
+                best = Some(Params { divr, divf, err })
             }
         }
     };
@@ -110,12 +134,9 @@ pub fn set_core_frequency(mut target: u64) -> u64 {
     }
 
     if let Some(b) = best {
-        unsafe {
-            core_pllcfg::put_pll_params(b.divr as i32, b.divf as i32, divq as i32)
-        };
-        b.freq
+        Some((b.divr, b.divf, divq))
     } else {
-        return get_core_frequency();
+        None
     }
 }
 
@@ -271,7 +292,7 @@ pub mod hfxosccfg {
 }
 
 impl_pllcfg!(core_pllcfg, 0x04);
-// core_plloutdiv at 0x8 is wholly reserved
+// core_plloutdiv at 0x08 is wholly reserved
 
 impl_pllcfg!(dvfs_core_pllcfg, 0x38);
 impl_plloutdiv!(dvfs_core_plloutdiv, 0x3C);
@@ -300,11 +321,37 @@ pub mod hfpclk_div_reg {
     }
 }
 
-impl_pllcfg!(ddr_pllcfg, 0xC);
+impl_pllcfg!(ddr_pllcfg, 0x0C);
 impl_plloutdiv!(ddr_plloutdiv, 0x10);
 
 impl_pllcfg!(gemgxl_pllcfg, 0x1C);
 impl_plloutdiv!(gemgcl_plloutdiv, 0x20);
+
+#[allow(dead_code)]
+pub mod core_clk_sel_reg {
+    use crate::register::AtomicRegisterI32RW;
+    use super::CLOCK_REG_BASE;
+
+    #[inline(always)]
+    unsafe fn register() -> AtomicRegisterI32RW {
+        AtomicRegisterI32RW::new(CLOCK_REG_BASE + 0x24)
+    }
+
+    #[inline(always)]
+    pub fn use_coreclk_not_hfclk() {
+        unsafe { self::register().store(0); }
+    }
+
+    #[inline(always)]
+    pub fn use_hfclk_not_coreclk() {
+        unsafe { self::register().store(1); }
+    }
+
+    #[inline(always)]
+    pub fn using_coreclk_not_hfclk() -> bool {
+        unsafe { self::register().fetch() == 0 }
+    }
+}
 
 #[allow(dead_code)]
 pub mod devices_reset_n {
@@ -455,6 +502,58 @@ pub mod clk_mux_status {
     #[inline(always)]
     pub fn get_mainmemclksel() -> bool {
         unsafe { self::register().get_bit(7) }
+    }
+}
+
+#[allow(dead_code)]
+pub mod corepllsel {
+    use crate::register::AtomicRegisterI32RW;
+    use super::CLOCK_REG_BASE;
+
+    #[inline(always)]
+    unsafe fn register() -> AtomicRegisterI32RW {
+        AtomicRegisterI32RW::new(CLOCK_REG_BASE + 0x40)
+    }
+
+    #[inline(always)]
+    pub fn use_corepll_not_dvfscorepll() {
+        unsafe { self::register().store(0); }
+    }
+
+    #[inline(always)]
+    pub fn use_dvfscorepll_not_corepll() {
+        unsafe { self::register().store(1); }
+    }
+
+    #[inline(always)]
+    pub fn using_corepll_not_dvfscorepll() -> bool {
+        unsafe {self::register().fetch() == 0 }
+    }
+}
+
+#[allow(dead_code)]
+pub mod hfpclkpllsel {
+    use crate::register::AtomicRegisterI32RW;
+    use super::CLOCK_REG_BASE;
+
+    #[inline(always)]
+    unsafe fn register() -> AtomicRegisterI32RW {
+        AtomicRegisterI32RW::new(CLOCK_REG_BASE + 0x58)
+    }
+
+    #[inline(always)]
+    pub fn use_hfpclkpll_not_hfclk() {
+        unsafe { self::register().store(0); }
+    }
+
+    #[inline(always)]
+    pub fn use_hfclk_not_hfpclkpll() {
+        unsafe { self::register().store(1); }
+    }
+
+    #[inline(always)]
+    pub fn using_hfpclkpll_not_hfclk() -> bool {
+        unsafe {self::register().fetch() == 0 }
     }
 }
 
