@@ -20,3 +20,7 @@ pub fn pause() {
         asm!("fence");
     }
 }
+
+pub fn display_machine_information() {
+    println!("Build: QEMU virt (riscv64)");
+}

@@ -24,3 +24,17 @@ pub fn cease() {
         llvm_asm!(".word 0x30500073" : : : "memory" : "volatile");
     }
 }
+
+pub fn display_machine_information() {
+    println!("Build: SiFive HiFive Unmatched");
+
+    println!("Clock Info:");
+    let corefreq = clock::get_core_frequency();
+    println!("  Core frequency = {} Hz", corefreq);
+    println!("  PLL cltx: {}", if clock::prci_plls::get_cltxpll() { "present" } else { "absent" });
+    println!("  PLL gemgxl: {}", if clock::prci_plls::get_gemgxlpll() { "present" } else { "absent" });
+    println!("  PLL ddr: {}", if clock::prci_plls::get_ddrpll() { "present" } else { "absent" });
+    println!("  PLL hfpclk: {}", if clock::prci_plls::get_hfpclkpll() { "present" } else { "absent" });
+    println!("  PLL dvfscore: {}", if clock::prci_plls::get_dvfscorepll() { "present" } else { "absent" });
+    println!("  PLL core: {}", if clock::prci_plls::get_corepll() { "present" } else { "absent" });
+}

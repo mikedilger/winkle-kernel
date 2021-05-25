@@ -33,6 +33,9 @@ extern "C" fn kernel_start() {
     use device::uart::{Uart, UartParity};
     unsafe { CONSOLE.set_line_settings(UartParity::None, 8, 1) };
 
+    // Print machine-level information
+    target::display_machine_information();
+
     println!("Hello World!\n");
 
     panic!("Not yet implemented.\n");
