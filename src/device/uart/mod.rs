@@ -12,6 +12,7 @@ pub trait Uart: Write {
                          data_bits: u8,
                          stop_bits: u8);
     fn set_baud_rate(&self, baud_hz: u32, uart_clock_hz: u32);
+    fn get_baud_rate(&self, uart_clock_hz: u32) -> u32;
 }
 
 #[allow(dead_code)]

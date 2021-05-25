@@ -81,6 +81,16 @@ pub fn set_core_frequency(target: u64) -> u64
     get_core_frequency()
 }
 
+#[allow(dead_code)]
+pub fn get_tlclk() -> u64 {
+    let coreclk = get_core_frequency();
+    if clk_mux_status::get_tlclksel() {
+        coreclk
+    } else {
+        coreclk / 2
+    }
+}
+
 fn compute_pll_params(mut target_freq: u64) -> Option<(u32, u32, u32)> {
     // Put target_freq values in range
     if target_freq <= 37_500_000 {

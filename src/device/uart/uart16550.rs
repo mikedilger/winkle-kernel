@@ -42,6 +42,11 @@ impl Uart for Uart16550 {
         let inner_guard = self.inner.lock();
         inner_guard.set_baud_rate(baud_hz, uart_clock_hz);
     }
+
+    fn get_baud_rate(&self, uart_clock_hz: u32) -> u32 {
+        let inner_guard = self.inner.lock();
+        inner_guard.get_baud_rate(uart_clock_hz)
+    }
 }
 
 impl Write for Uart16550 {
@@ -179,8 +184,28 @@ impl InnerUart16550 {
         lcr.set_bit(7, false);
         unsafe { self.lcr() }.store(lcr);
     }
+
+    pub fn get_baud_rate(&self, uart_clock_hz: u32) -> u32
+    {
+        // Turn on the divisor latch
+        let mut lcr = unsafe { self.lcr() }.fetch();
+        lcr.set_bit(7, true);
+        unsafe { self.lcr() }.store(lcr);
+
+        // Read the divisor
+        let msb = unsafe { self.dlr_msb() }.fetch();
+        let lsb = unsafe { self.dlr_lsb() }.fetch();
+
+        // Turn off the divisor latch
+        lcr.set_bit(7, false);
+        unsafe { self.lcr() }.store(lcr);
+
+        // Compute the divisor
+        let divisor = ((msb as u32) << 8) | (lsb as u32);
+
+        (uart_clock_hz / divisor) / 16
+    }
 }
 
 unsafe impl Sync for Uart16550 {}
 unsafe impl Send for Uart16550 {}
-
