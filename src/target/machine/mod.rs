@@ -13,10 +13,10 @@ mod sifive_hifive_unmatched;
 #[cfg(machine = "sifive-hifive-unmatched")]
 pub use sifive_hifive_unmatched::*;
 
-#[cfg(machine = "polarfire-icicle-kit")]
-mod polarfire_icicle_kit;
-#[cfg(machine = "polarfire-icicle-kit")]
-pub use polarfire_icicle_kit::*;
+#[cfg(machine = "microchip-polarfire-icicle")]
+mod microchip_polarfire_icicle;
+#[cfg(machine = "microchip-polarfire-icicle")]
+pub use microchip_polarfire_icicle::*;
 
 #[cfg(machine = "")]
 compile_error!("Winkle requires a specific machine to be defined");
@@ -25,7 +25,7 @@ compile_error!("Winkle requires a specific machine to be defined");
     not(machine = "qemu-riscv64-virt"),
     not(machine = "sifive-hifive-unleashed"),
     not(machine = "sifive-hifive-unmatched"),
-    not(machine = "polarfire-icicle-kit")
+    not(machine = "microchip-polarfire-icicle")
 ))]
 compile_error!("Winkle does not support the specified machine");
 
