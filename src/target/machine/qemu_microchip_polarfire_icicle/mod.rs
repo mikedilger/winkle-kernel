@@ -2,7 +2,7 @@
 // FIXME
 global_asm!(include_str!("../sifive_hifive_unmatched/boot.S"));
 
-compile_error!("Microchip PolarFire SoC Icicle Kit will be supported soon, but is not yet.");
+compile_error!("QEMU Microchip PolarFire SoC Icicle Kit will be supported soon, but is not yet.");
 
 #[allow(dead_code)]
 pub const UART0_ADDR: usize = 0x2000_0000;
@@ -25,5 +25,5 @@ pub fn cease() {
 }
 
 pub fn display_machine_information() {
-    println!("Build: Microchip PolarFire SoC Icicle Kit");
+    println!("Build: QEMU Microchip PolarFire SoC Icicle Kit");
 }

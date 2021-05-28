@@ -18,6 +18,11 @@ mod microchip_polarfire_icicle;
 #[cfg(machine = "microchip-polarfire-icicle")]
 pub use microchip_polarfire_icicle::*;
 
+#[cfg(machine = "qemu-microchip-polarfire-icicle")]
+mod qemu_microchip_polarfire_icicle;
+#[cfg(machine = "qemu-microchip-polarfire-icicle")]
+pub use qemu_microchip_polarfire_icicle::*;
+
 #[cfg(machine = "")]
 compile_error!("Winkle requires a specific machine to be defined");
 
@@ -25,7 +30,8 @@ compile_error!("Winkle requires a specific machine to be defined");
     not(machine = "qemu-riscv64-virt"),
     not(machine = "sifive-hifive-unleashed"),
     not(machine = "sifive-hifive-unmatched"),
-    not(machine = "microchip-polarfire-icicle")
+    not(machine = "microchip-polarfire-icicle"),
+    not(machine = "qemu-microchip-polarfire-icicle")
 ))]
 compile_error!("Winkle does not support the specified machine");
 
