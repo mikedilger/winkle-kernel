@@ -27,6 +27,9 @@ pub fn cease() {
     }
 }
 
+pub fn init() {
+}
+
 pub fn display_machine_information() {
     println!("Build: SiFive HiFive Unmatched");
 

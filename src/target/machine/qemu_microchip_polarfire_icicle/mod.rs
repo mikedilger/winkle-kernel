@@ -6,7 +6,7 @@ compile_error!("QEMU Microchip PolarFire SoC Icicle Kit will be supported soon, 
 
 #[allow(dead_code)]
 pub const UART0_ADDR: usize = 0x2000_0000;
-// PolarFire UART has no device driver yet.  We have no console.
+// Missing CONSOLE
 
 #[inline(always)]
 pub fn pause() {
@@ -22,6 +22,9 @@ pub fn cease() {
     unsafe {
         llvm_asm!(".word 0x30500073" : : : "memory" : "volatile");
     }
+}
+
+pub fn init() {
 }
 
 pub fn display_machine_information() {

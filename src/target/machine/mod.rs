@@ -39,10 +39,12 @@ compile_error!("Winkle does not support the specified machine");
  * Each machine needs to define the following:
  *
  *   The label "_start" where execution begins
+ *   fn init() for initializing the hardware
+ *   fn display_machine_information() for logging info about the hardware
+ *   fn pause() for spinlocks
  *   const UART0_ADDR: usize
  *   static CONSOLE: T
  *       where T: Uart
  *       and has const new fn
- *   fn pause()
  */
 

@@ -29,16 +29,23 @@ fn panic(info: &core::panic::PanicInfo) -> !
 #[no_mangle]
 extern "C" fn kernel_start() {
 
-    // Initialize UART
+    // Initialize the hardware
+    target::init();
+
+    // Initialize the CONSOLE
     use device::uart::{Uart, UartParity};
     unsafe { CONSOLE.set_line_settings(UartParity::None, 8, 1) };
+    // For now we leave the baud rate as the default, or whatever target::init()
+    // selects.
 
     // Print machine-level information
     target::display_machine_information();
 
+    // Print a few more things and finish up, as we don't have a useable
+    // operating system yet.
     println!("Hello World!\n");
 
-    panic!("Not yet implemented.\n");
+    panic!("Cannot Continue - Operating System is not yet implemented.\n");
 }
 
 #[cfg(debug_assertions)]

@@ -21,6 +21,9 @@ pub fn pause() {
     }
 }
 
+pub fn init() {
+}
+
 pub fn display_machine_information() {
     println!("Build: QEMU virt (riscv64)");
 }
