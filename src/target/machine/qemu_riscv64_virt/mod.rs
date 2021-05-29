@@ -1,6 +1,6 @@
 
 // FIXME
-global_asm!(include_str!("../sifive_hifive_unmatched/boot.S"));
+global_asm!(include_str!("boot.S"));
 
 use crate::device::uart::uart16550::Uart16550;
 

@@ -27,12 +27,6 @@ _start:
         /* Set our SATP (address translation) to Bare mode (on all harts) */
         csrw            satp, zero
 
-	/* SiFive has a 'chicken bit'. Our code just presumes it is '1'. See */
-	/* freedom-metal entry.S for code that branches on it. This code is for */
-	/* SiFive systems ONLY (this is undefined behavior elsewhere). */
-        /* Clear the feature disable register for all cores: */
-	csrwi           0x7C1, 0
-
 .align 4
 1:
 
@@ -47,8 +41,7 @@ _start:
         mul             t0, t0, a0
         sub             sp, sp, t0
 
-        /* If not mhartid 0, go idle (SiFive hart 0 is the realtime S7), which supports
-           everything we need for booting (we don't use hardfloats in the kernel at all) */
+        /* If not mhartid 0, go idle */
         bnez            a0, idle
 
         /* Most OSes would clear the BSS. Rust doesn't presume and zeros memory. */
