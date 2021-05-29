@@ -27,6 +27,10 @@ _start:
         /* Set our SATP (address translation) to Bare mode (on all harts) */
         csrw            satp, zero
 
+        /* This is sifive's chicken bit.  I don't know why qemu simulates it on the virt */
+        /* machine, but without disabling this bit, it doesn't work */
+        csrwi           0x7C1, 0
+
 .align 4
 1:
 
