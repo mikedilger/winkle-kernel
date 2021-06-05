@@ -3,11 +3,6 @@ mod qemu_riscv64_virt;
 #[cfg(machine = "qemu-riscv64-virt")]
 pub use qemu_riscv64_virt::*;
 
-#[cfg(machine = "sifive-hifive-unleashed")]
-mod sifive_hifive_unleashed;
-#[cfg(machine = "sifive-hifive-unleashed")]
-pub use sifive_hifive_unleashed::*;
-
 #[cfg(machine = "sifive-hifive-unmatched")]
 mod sifive_hifive_unmatched;
 #[cfg(machine = "sifive-hifive-unmatched")]
@@ -28,7 +23,6 @@ compile_error!("Winkle requires a specific machine to be defined");
 
 #[cfg(all(
     not(machine = "qemu-riscv64-virt"),
-    not(machine = "sifive-hifive-unleashed"),
     not(machine = "sifive-hifive-unmatched"),
     not(machine = "microchip-polarfire-icicle"),
     not(machine = "qemu-microchip-polarfire-icicle")
