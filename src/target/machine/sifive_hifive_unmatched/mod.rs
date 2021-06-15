@@ -9,7 +9,7 @@ mod clock;
 pub const UART0_ADDR: usize = 0x1001_0000;
 #[allow(dead_code)]
 pub const UART1_ADDR: usize = 0x1001_1000;
-pub static mut CONSOLE: SifiveUart = unsafe { SifiveUart::new(UART0_ADDR) };
+pub static mut CONSOLE: SifiveUart = unsafe { SifiveUart::new(UART1_ADDR) };
 
 #[inline(always)]
 pub fn pause() {
