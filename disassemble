@@ -1,0 +1,3 @@
+#!/bin/bash
+
+riscv64-elf-objdump -d -b elf64-littleriscv -m riscv ./target/riscv64imac-unknown-winklekernel-elf/release/kernel
